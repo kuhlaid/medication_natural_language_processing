@@ -27,7 +27,7 @@ def _check_num_slash(x):
 
 def _split_and_strip(txt, delim):
     word = txt.split(delim)
-    return map(lambda x: x.strip(), word)
+    return list(map(lambda x: x.strip(), word))
 
 
 def try_splits(med):
@@ -36,7 +36,7 @@ def try_splits(med):
         word = _split_and_strip(med, ":")
     elif "(" in med:
         word = _split_and_strip(med, "(")
-        word = map(lambda x: x.replace(")", "").strip(), word)
+        word = list(map(lambda x: x.replace(")", "").strip(), word))
     elif ";" in med:
         word = _split_and_strip(med, ";")
     return word
@@ -130,7 +130,7 @@ def fix_words(med, medWords, medDict):
                     'sliding', 'scale', 'scal', 'bolus', 'take',
                     'home', 'pack', 'coated', 'parenteral', 'vaginal', "#",
                     'supp', 'supplements', 'er'])
-    words = sorted(set(medWords).difference(badWords), key=medWords.index)
+    words = sorted(set(medWords).difference(badWords))
     words = map(lambda x: x.replace('%', ''), words)
     words = map(_check_num_slash, words)
     words = clean_words(words)
@@ -174,7 +174,7 @@ def fuzzy_match(med, words, medDict):
     txt = difflib.get_close_matches(med, medDict.keys(),
                                     cutoff=0.9, n=1)
     if len(txt) > 0:
-        print "matched:" + med + " with " + txt[0]
+        print("matched:" + med + " with " + txt[0])
         return _format_return(txt[0], words, medDict)
     return _format_return(med, words, medDict)
 
@@ -189,7 +189,7 @@ def quick_match(med, words, medDict):
     tmp = map(lambda x: _check_dist(med, x), medKeys)
     if any(tmp):
         idx = np.flatnonzero(np.array(tmp))[0]
-        return _format_return(medKeys[idx], words, medDict)
+        return _format_return(list(medKeys)[idx], words, medDict)
     return _format_return(med, words, medDict)
 
 
@@ -208,7 +208,7 @@ def quick_lookup(med, words, medDict):
                    'tetanus': 'immunostimulants',
                    'tpn': 'tpn',
                    'vaccine': 'vaccine'}
-    for k, v in quickLookup.iteritems():
+    for k, v in quickLookup.items():
         if k in med and 'discontinue' not in med:
             return _format_return(v, words, medDict)
     return _format_return(med, words, medDict)
@@ -305,7 +305,7 @@ def check_rxnorm(med, medDict):
             ingd = map(lambda x: x.replace(' / ', '/'), ingd)
             catIdx = _check_items_in_dict(ingd, medDict)
             if catIdx is not None:
-                print "RxNorm Brand:" + str(med) + "->" + str(ingd[catIdx])
+                print("RxNorm Brand:" + str(med) + "->" + str(ingd[catIdx]))
                 return medDict[ingd[catIdx]]
             # do a soft spelling check
             ingdSoft = map(lambda x: _find_most_similar(x, medDict.keys()),
@@ -317,13 +317,13 @@ def check_rxnorm(med, medDict):
     if brands is not None:
         brandsIdx = _check_items_in_dict(brands, medDict)
         if brandsIdx is not None:
-            print "RxNorm Brand:" + str(med) + "->" + str(brands[brandsIdx])
+            print("RxNorm Brand:" + str(med) + "->" + str(brands[brandsIdx]))
             return medDict[brands[brandsIdx]]
     approxTerms = queryRxNorm.get_approx_term(med)
     if approxTerms is not None:
         approxIdx = _check_items_in_dict(approxTerms, medDict)
         if approxIdx is not None:
-            print "RxNorm Brand:" + str(med) + "->" + str(approxTerms[approxIdx])   # noqa
+            print("RxNorm Brand:" + str(med) + "->" + str(approxTerms[approxIdx]))   # noqa
             return medDict[approxTerms[approxIdx]]
     return None
 
@@ -332,8 +332,9 @@ def get_med_approx(med, medDict):
     med = med.replace(' - ', '-')
     # search by splitting either on : or ()
     medWords = try_splits(med)
-    medSuccess = map(lambda x: x in medDict, medWords)
+    medSuccess = list(map(lambda x: x in medDict, medWords))
     if any(medSuccess):
+        # print("medSuccess=",str(medSuccess))
         idx = medSuccess.index(True)
         return medWords[idx], medDict[medWords[idx]]
     tmpMed = med.replace("w/", "/ ")
@@ -349,9 +350,9 @@ def get_med_approx(med, medDict):
         # print str(func), tmpMed, words
         tmpMed, words, medType = func(tmpMed, words, medDict)
         if medType is not None:
-            print "Med:" + str(med) + " = " + str(tmpMed)
+            # print("Med:" + str(med) + " = " + str(tmpMed))
             return tmpMed, medType
-        if not len(words):
+        if (type(words) is filter) or (type(words) is list and not len(words)):
             return med, None
     if "/" in med:
         slashWords = med.split('/')
@@ -360,7 +361,7 @@ def get_med_approx(med, medDict):
         if all(slashCat):
             slashCat = map(lambda x: medDict[x], slashWords)
             grpCat = set(list(itertools.chain(*slashCat)))
-            print "Concatenated together:" + med
+            print("Concatenated together:" + med)
             return ' '.join(slashWords), list(grpCat)
     medType = check_rxnorm(med, medDict)
     if medType is not None:
@@ -391,9 +392,9 @@ def get_supp_approx(med, suppDict):
 
 def main():
     import json
-    uk2 = json.load(open('ungrouped.json', 'rb'))
-    medDict = json.load(open("data/drugDict.json", "rb"))
-    suppDict = json.load(open("data/suppDict.json", "rb"))
+    uk2 = json.load(open('ungrouped.json', 'r'))
+    medDict = json.load(open("data/drugDict.json", "r"))
+    suppDict = json.load(open("data/suppDict.json", "r"))
     uk1 = set([])
     for med in sorted(uk2.keys()):
         if med in medDict:
@@ -403,20 +404,20 @@ def main():
         if medType is not None:
             continue
         if med in suppDict:
-            print "supplement:" + str(med)
+            print("supplement:" + str(med))
             continue
         newSupp = format_supplement(med)
         if newSupp in suppDict:
-            print "supplement:" + str(med)
+            print("supplement:" + str(med))
             continue
         txt = difflib.get_close_matches(med, suppDict.keys(),
                                         cutoff=0.9, n=1)
         if len(txt) > 0:
-            print "matched:" + med + " with " + txt[0]
+            print("matched:" + med + " with " + txt[0])
             continue
         uk1.add(med)
     pprint.pprint(sorted(uk1))
-    print len(uk1)
+    print(len(uk1))
 
 
 if __name__ == "__main__":

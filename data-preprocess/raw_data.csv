@@ -1,4 +1,4 @@
-patient_id, medication, reason_for_taking_medication
+patient_id,medication,reason_for_taking_medication
 XYZ1,Amitriptyline,seizure
 XYZ1,Warfarin (coumadin),blood thinner
 XYZ1,Cymbalta (duloxetine),depression

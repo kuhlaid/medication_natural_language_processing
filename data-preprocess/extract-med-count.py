@@ -1,25 +1,29 @@
 import csv
 import argparse
 import json
+import pandas as pd
 from collections import Counter
 
-
-def parse_file(filename, medIdx, delim, header):
-    medFile = csv.reader(open(filename, 'r'), delimiter=delim)
+# this script counts the number of medications listed in the raw_data.csv and outputs the list of medications and counts to a JSON file
+def parse_file(filename, medName, delim, header):
+    medFile = pd.read_csv(filename, delimiter=delim)
     medCounter = Counter()
-    if header:
-        medFile.next()
-    for row in medFile:
-        if len(row) > medIdx:
-            med = row[medIdx].strip().lower()
-            medCounter[med] += 1
+    # print('delim=',delim)
+    # print('parse_file', filename)
+    for index, row in medFile.iterrows():
+        # print('row=', str(list(row)), ' and index=',medName)
+        # print('parse_file row', row[medName.strip()].strip().lower())
+        med = row[medName.strip()].lower()      # we need to make sure our column names do not begin or end with a space
+        # print('len(row)=', len(row), " med=", row[medName.strip()])
+        # # print('medCounter')
+        medCounter[med] += 1
     return medCounter
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("infile", help="input file")
-    parser.add_argument("medIdx", type=int, help="column index for medication")
+    parser.add_argument("medName", type=str, help="what is the name of the medications column")
     parser.add_argument("-sep", type=int, default=1,
                         help="delimiter seperator")
     parser.add_argument('outfile', help="output file")
@@ -28,7 +32,7 @@ def main():
     sepType = ","
     if args.sep == 2:
         sepType = "\t"
-    medCounter = parse_file(args.infile, args.medIdx, sepType, args.hdr)
+    medCounter = parse_file(args.infile, args.medName, sepType, args.hdr)
     with open(args.outfile, 'w') as outfile:
         json.dump(medCounter, outfile, indent=2)
 

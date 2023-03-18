@@ -19,7 +19,7 @@ def parse_rx_string(txt):
 
 
 def set_to_list(sDict):
-    return dict(map(lambda (k, v): (k, list(v)), sDict.iteritems()))
+    return dict(map(lambda k,v: (k, list(v)), sDict.items()))
 
 
 def get_li_a_text(soup_li, toLower=True):

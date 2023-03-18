@@ -1,4 +1,5 @@
 import csv
+import json
 import pprint
 import difflib
 from collections import Counter
@@ -13,9 +14,9 @@ filename_output_matched_reason_count = sys.argv[3] #ex; df_matched_reason_count.
 filename_output_unmatched_reason_count = sys.argv[4] #ex: df_unmatched_reason_count.csv
 
 ### COLUMNS TO USE
-MED_REASON_IDX = 2
-PATIENT_IDX = 0
-MED_CLASS_IDX = 5
+MED_REASON_IDX = 'reason_for_taking_medication'
+PATIENT_IDX = 'patient_id'
+MED_CLASS_IDX = 'med_class'
 
 CFS_SI_SYMPTOMS =['sore throat', 'lymph', 'pem', 'muscle pain', 
     'joint pain', 'unrefreshing sleep', 'headaches',
@@ -70,7 +71,7 @@ SYNONYMS = {
     }
 
 def subSynonyms(word):
-    if SYNONYMS.has_key(word):
+    if word in SYNONYMS:
         return SYNONYMS[word]
     else:
         return word
@@ -172,80 +173,84 @@ def replaceKeyword(symptom):
             return v
     return symptom
 
+def main():
+    # print("read filename_input_med_processed_drugs_only v2=",filename_input_med_processed_drugs_only.strip(),"==")
+    medReader = pd.read_csv(filename_input_med_processed_drugs_only, delimiter=",")
 
+    l_orig_sx = []
+    l_mapped_sx = []
+    l_num_matched_sx = []
+    l_unmatched = []
+    l_unmatched_ratio = []
+    l_matched = []
+    l_patients = []
+    l_meds = []
 
-medFile = open(filename_input_med_processed_drugs_only, 'rb')
-medReader = csv.reader(medFile, delimiter=",")
-medReader.next() ## Read the header file
-
-l_orig_sx = []
-l_mapped_sx = []
-l_num_matched_sx = []
-l_unmatched = []
-l_unmatched_ratio = []
-l_matched = []
-l_patients = []
-l_meds = []
-
-symptomCounter = Counter()
-for row in medReader:
-    patient_id = str(row[PATIENT_IDX].strip())
-    l_patients.append(patient_id)
-    med_class = row[MED_CLASS_IDX].strip().lower()
-    l_meds.append(med_class)
-    symptom = row[MED_REASON_IDX].strip().lower()
-    l_orig_sx.append(symptom)
-    if symptom == '':
-        continue
-    symptom = subSynonyms(symptom)
-    ## try to find the closest match
-    symptomMatch = difflib.get_close_matches(symptom, STEM_CFS_SI, n=1)
-    l_num_matched_sx.append(len(symptomMatch))
-    if len(symptomMatch) == 0 or difflib.SequenceMatcher(None, symptom, symptomMatch[0]).ratio() < 0.9:
-        l_unmatched.append(symptom)
-        if len(symptomMatch) == 0:
-            l_unmatched_ratio.append(np.nan)
+    # print("the medReader file is not being generated correctly - buildSympt loop")
+    symptomCounter = Counter()
+    for index, row in medReader.iterrows():
+        # print("medReader.iterrows row=",str(row))
+        # print("medReader.iterrows len=",len(row))
+        patient_id = str(row[PATIENT_IDX].strip())
+        l_patients.append(patient_id)
+        med_class = row[MED_CLASS_IDX].strip().lower()
+        l_meds.append(med_class)
+        symptom = row[MED_REASON_IDX].strip().lower()
+        l_orig_sx.append(symptom)
+        if symptom == '':
+            continue
+        symptom = subSynonyms(symptom)
+        ## try to find the closest match
+        symptomMatch = difflib.get_close_matches(symptom, STEM_CFS_SI, n=1)
+        l_num_matched_sx.append(len(symptomMatch))
+        if len(symptomMatch) == 0 or difflib.SequenceMatcher(None, symptom, symptomMatch[0]).ratio() < 0.9:
+            l_unmatched.append(symptom)
+            if len(symptomMatch) == 0:
+                l_unmatched_ratio.append(np.nan)
+            else:
+                l_unmatched_ratio.append(difflib.SequenceMatcher(None, symptom, symptomMatch[0]).ratio())
+            ### here try to do pattern matching
+            symptom = replaceKeyword(symptom)
+            symptomCounter[symptom] += 1
+            l_mapped_sx.append(symptom)
         else:
-            l_unmatched_ratio.append(difflib.SequenceMatcher(None, symptom, symptomMatch[0]).ratio())
-        ### here try to do pattern matching
-        symptom = replaceKeyword(symptom)
-        symptomCounter[symptom] += 1
-        l_mapped_sx.append(symptom)
-    else:
-        l_matched.append(symptom)
-        symptomCounter[symptomMatch[0]] += 1
-        l_mapped_sx.append(symptomMatch[0])
+            l_matched.append(symptom)
+            symptomCounter[symptomMatch[0]] += 1
+            l_mapped_sx.append(symptomMatch[0])
 
-d_unmatched_counts = Counter(l_unmatched)
-l_unmatched_counts = [d_unmatched_counts[x] for x in l_unmatched]
+    d_unmatched_counts = Counter(l_unmatched)
+    l_unmatched_counts = [d_unmatched_counts[x] for x in l_unmatched]
 
-df_all_patient_matched_reason_med = pd.DataFrame([])
-df_all_patient_matched_reason_med['PATIENT'] = l_patients
-df_all_patient_matched_reason_med['REASON_ORIG'] = l_orig_sx
-df_all_patient_matched_reason_med['REASON_MAPPED'] = l_mapped_sx
-df_all_patient_matched_reason_med['MED'] = l_meds
-df_all_patient_matched_reason_med.to_csv(filename_output_patient_matchedReason_med , index = None, header = False)
+    df_all_patient_matched_reason_med = pd.DataFrame([])
+    df_all_patient_matched_reason_med['PATIENT'] = l_patients
+    df_all_patient_matched_reason_med['REASON_ORIG'] = l_orig_sx
+    df_all_patient_matched_reason_med['REASON_MAPPED'] = l_mapped_sx
+    df_all_patient_matched_reason_med['MED'] = l_meds
+    df_all_patient_matched_reason_med.to_csv(filename_output_patient_matchedReason_med , index = None, header = False)
 
-df_unmatched = pd.DataFrame([])
-df_unmatched['UNMATCHED_SX_NAME'] = l_unmatched
-df_unmatched['RATIO'] = l_unmatched_ratio
-df_unmatched['COUNT'] = l_unmatched_counts
-df_unmatched.to_csv('df_unmatched_SX_NAME_COUNT.csv', header = True, index = None)
-df_unmatched_unique = pd.DataFrame([])
-df_unmatched_unique['UMATCHED_SX_NAME'] = list(np.unique(l_unmatched))
-df_unmatched_unique['COUNT'] = [d_unmatched_counts[x] for x in  list(np.unique(l_unmatched))]
-df_unmatched_unique = df_unmatched_unique.sort_values(by=['COUNT'], ascending=False)
-df_unmatched_unique.to_csv(filename_output_unmatched_reason_count, header = False, index = None)
+    df_unmatched = pd.DataFrame([])
+    df_unmatched['UNMATCHED_SX_NAME'] = l_unmatched
+    df_unmatched['RATIO'] = l_unmatched_ratio
+    df_unmatched['COUNT'] = l_unmatched_counts
+    df_unmatched.to_csv('df_unmatched_SX_NAME_COUNT.csv', header = True, index = None)
+    df_unmatched_unique = pd.DataFrame([])
+    df_unmatched_unique['UMATCHED_SX_NAME'] = list(np.unique(l_unmatched))
+    df_unmatched_unique['COUNT'] = [d_unmatched_counts[x] for x in  list(np.unique(l_unmatched))]
+    df_unmatched_unique = df_unmatched_unique.sort_values(by=['COUNT'], ascending=False)
+    df_unmatched_unique.to_csv(filename_output_unmatched_reason_count, header = False, index = None)
 
-with open('symptom_count.txt', 'wb') as outfile:
-    symptomWriter = csv.writer(outfile, delimiter="\t")
-    for k, v in symptomCounter.items():
-        symptomWriter.writerow([k, v])
-medFile.close()
+    with open('symptom_count.txt', 'w') as outfile:
+        symptomWriter = csv.writer(outfile, delimiter="\t")
+        for k, v in symptomCounter.items():
+            symptomWriter.writerow([k, v])
+    # medFile.close()
 
-df_matched_symptom_count = pd.read_csv('symptom_count.txt', header = None, delimiter='\t')
-df_matched_symptom_count = df_matched_symptom_count.sort_values(by=[1], ascending=False)
-df_matched_symptom_count.to_csv(filename_output_matched_reason_count , index = None, header = False)
+    df_matched_symptom_count = pd.read_csv('symptom_count.txt', header = None, delimiter='\t')
+    df_matched_symptom_count = df_matched_symptom_count.sort_values(by=[1], ascending=False)
+    df_matched_symptom_count.to_csv(filename_output_matched_reason_count , index = None, header = False)
 
-print(pprint.pformat(dict(symptomCounter)))
-print len(symptomCounter)
+    print(pprint.pformat(dict(symptomCounter)))
+    print("len(symptomCounter)",len(symptomCounter))
+
+if __name__ == "__main__":
+    main()

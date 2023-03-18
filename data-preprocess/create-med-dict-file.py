@@ -47,13 +47,14 @@ def _append_to_dict(k, outputDict, medDict, suppDict):
 
 
 def create_med_dict(filename, outputDict, mdFile, spFile):
-    medCount = json.load(open(filename, 'rb'))
-    medDict = json.load(open(mdFile, "rb"))
-    suppDict = json.load(open(spFile, "rb"))
+    # print ("create_med_dict-",filename)
+    medCount = json.load(open(filename, 'r'))
+    medDict = json.load(open(mdFile, "r"))
+    suppDict = json.load(open(spFile, "r"))
     fileDict = {}
     unmatchedDict = {}
     errList = []
-    for k, v in sorted(medCount.iteritems(), key=lambda (k, v): (v, k),
+    for k, v in sorted(medCount.items(), key=(lambda kv: (kv[1], kv[0])),
                        reverse=True):
         if k in medDict:
             fileDict[k] = medDict[k]
@@ -81,11 +82,11 @@ def create_med_dict(filename, outputDict, mdFile, spFile):
         elif not success:
             unmatchedDict[med] = medCount[med]
         errList.remove(med)
-    with open(outputDict, 'wb') as outfile:
+    with open(outputDict, 'w') as outfile:
         json.dump(fileDict, outfile, indent=2)
-    with open('unresolved.json', 'wb') as outfile:
+    with open('unresolved.json', 'w') as outfile:
         json.dump(OrderedDict(sorted(unmatchedDict.items(),
-                                     key=lambda t: t[1],
+                                     key=lambda t:t[1],
                                      reverse=True)),
                   outfile, indent=2)
 
